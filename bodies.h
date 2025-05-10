@@ -27,3 +27,12 @@ struct krk{
 typedef struct krk K_rk4;
 
 void read_init_value(BODY *bod, int nr_corp);
+float putere(float x, int a); 
+float dist32(BODY a, BODY b, float pas, VECT k_a, VECT k_b); 
+void init_acc(BODY *corp, int nr_total);
+void rez_acc_vit(BODY *corp,int nr_total, float h, K_rk4 *k); 
+void get_k(BODY *corp, int nr_total, K_rk4 **k); 
+void cpy_corp(BODY *corp, int nr_total, BODY **corp_cpy); 
+void rk4(BODY *corp, int nr_total, float h); 
+float dist_OB(BODY a); 
+void update_size(BODY *corp, int nr_total); 
