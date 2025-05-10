@@ -1,0 +1,1 @@
+gcc bodies.c main.c -o scss
