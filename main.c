@@ -16,7 +16,7 @@ int main()
         (corp+i)->file = fopen(fisier, "wb");
     }
 
-
-    
+    printf("heil heil heil"); 
+    printf("asuhijkdlas;'dsa"); 
     return 0;
 }
