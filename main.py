@@ -10,33 +10,34 @@ window_width = 1000
 window_height = 1000
 window.config(width=window_width, height=window_height)
 
-# window centering
+# window centering and configuration
 screen_width = window.winfo_screenwidth()
 screen_height = window.winfo_screenheight()
 x = int((screen_width / 2) - (window_width / 2))
 y = int((screen_height / 2) - (window_height / 2))
 window.geometry(f"{window_width}x{window_height}+{x}+{y}")
 
-main_canvas = Canvas(window, width=window_width, height=window_height, bg="white", highlightthickness=0)
-main_canvas.pack(fill=BOTH, expand=YES)
-
 # origin point
 ABS_ZERO_X = window_width // 2
 ABS_ZERO_Y = window_height // 2
 
-# Colors for trajectories (you can add more if needed)
+# colors for trajectories
 TRAJECTORY_COLORS = ["red", "green", "blue", "yellow", "cyan", "magenta"]
 
-# moving animation for the bodies
-def move_image_smoothly(image_id, x_start, y_start, x_end, y_end, duration=0.00001):
-    steps = 20
-    for step in range(steps + 1):
-        progress = step / steps
-        current_x = x_start + (x_end - x_start) * progress
-        current_y = y_start + (y_end - y_start) * progress
-        main_canvas.coords(image_id, current_x, current_y)
-        window.update()
-        time.sleep(duration / steps)
+# global variables for state management
+image_objects = []   # list of objects displayed on the canvas
+trajectory_lines = []   # stores trajectory line IDs
+coord_labels = []  # stores labels with (x,y) coordinates
+file_number = 0   # how many bodies we have
+xbody, ybody = [], []  # coordinates from simulation files
+screenimages = []
+simulation_running = False # flag used by reset button
+step_counter = 0 
+isTrajectoryOff = False # flag used by trajectory toggler
+
+
+main_canvas = Canvas(window, width=window_width, height=window_height)
+main_canvas.pack(fill = "both", expand= True)
 
 # function made to get the information from the files filled by the C source code
 def get_file_info():
@@ -56,64 +57,147 @@ def get_file_info():
                 x, y = map(float, line.strip().split()) # data was read as string -> conversion to float individuals
                 body_x.append(x)
                 body_y.append(y)
-        xbody.append(body_x)
+        xbody.append(body_x) # array of arrays
         ybody.append(body_y)
     
     return file_number, xbody, ybody
 
-file_number, xbody, ybody = get_file_info()
-
 DOT = "dot.png"
-    
 original_image = Image.open(DOT)
 
-#image redimensioning 
-width = int(original_image.width * 0.1)
+# image redimensioning 
+width = int(original_image.width * 0.1) 
 height = int(original_image.height * 0.1)
+
 resized_image = original_image.resize((width, height))
 tk_image = ImageTk.PhotoImage(resized_image)
 
-# list of objects displayed on the canvas
-image_objects = []
-trajectory_lines = []  # To store trajectory line IDs
+PIL_bg = Image.open("bg.png")
+TK_bg = ImageTk.PhotoImage(PIL_bg)
 
-# objects' initialization
-for i in range(file_number):
-    if tk_image:
-        img_obj = main_canvas.create_image(ABS_ZERO_X + xbody[i][0], ABS_ZERO_Y + ybody[i][0], image=tk_image)
-        image_objects.append(img_obj)
-        # create an empty trajectory line for each body
-        traj_line = main_canvas.create_line(ABS_ZERO_X + xbody[i][0], ABS_ZERO_Y + ybody[i][0],
-                                           ABS_ZERO_X + xbody[i][0], ABS_ZERO_Y + ybody[i][0],
-                                           fill=TRAJECTORY_COLORS[i % len(TRAJECTORY_COLORS)], width=1)
-        trajectory_lines.append(traj_line)
+# Create background image at center
+bgID = main_canvas.create_image(100, 100, image=TK_bg)
+screenimages.append(TK_bg) # save the image as reference 
+main_canvas.tag_lower(bgID) #place behind the bodies
 
-def animate():
-    if xbody and ybody and len(xbody[0]) > 1:
-        steps = len(xbody[0]) # define the number of steps based on the data stored
+# UI elements
+progress_label = Label(window, text="Pas: 0", fg="black", bg="white", font=("Arial", 10))
+progress_label.place(x=120, y=10)
+
+# reset simulation state and UI
+def reset_simulation():
+    global image_objects, trajectory_lines, coord_labels, xbody, ybody
+    global file_number, step_counter, simulation_running, isTrajectoryOff
+
+    # delete every trace except the background
+    main_canvas.delete("all")
+    
+    bgID = main_canvas.create_image(window_width // 2, window_height // 2, image=TK_bg)
+    screenimages.append(TK_bg)
+    main_canvas.tag_lower(bgID)
+
+    image_objects.clear()
+    trajectory_lines.clear()
+    coord_labels.clear()
+    simulation_running = False
+    step_counter = 0
+
+    file_number, xbody, ybody = get_file_info()
+
+    # objects' initialization
+    for i in range(file_number):
+        if tk_image:
+            img_obj = main_canvas.create_image(ABS_ZERO_X + xbody[i][0], (ABS_ZERO_Y + ybody[i][0]), image=tk_image)
+            image_objects.append(img_obj)
+           
+            # create an empty trajectory line for each body
+            traj_line = main_canvas.create_line(ABS_ZERO_X + xbody[i][0], (ABS_ZERO_Y + ybody[i][0]),
+                                                ABS_ZERO_X + xbody[i][0], (ABS_ZERO_Y + ybody[i][0]),
+                                                fill=TRAJECTORY_COLORS[i % len(TRAJECTORY_COLORS)], width=1)
+            trajectory_lines.append(traj_line)
+
+            # create label for coordinates
+            label = main_canvas.create_text(ABS_ZERO_X + xbody[i][0], (ABS_ZERO_Y + ybody[i][0] - 15),
+                                            text=f"{xbody[i][0]:.1f}, {ybody[i][0] * (-1):.1f}", fill="black", font=("Arial", 8))
+            coord_labels.append(label)
+    progress_label.config(text="Pas: 0")
+    isTrajectoryOff = False
+
+# moving animation for the bodies
+def animate(step=0):
+    global simulation_running, currentArrayPosition, currentStep
+    if not simulation_running or step >= len(xbody[0]) - 1:
+        simulation_running = False
+        return
+
+    for i in range(file_number):
+        current_x = ABS_ZERO_X + xbody[i][step]
+        current_y = (ABS_ZERO_Y + ybody[i][step])
         
-        for step in range(steps - 1):
-            # at each step, we are updating each body's position
-            for i in range(file_number):
-                current_x = ABS_ZERO_X + xbody[i][step]
-                current_y = ABS_ZERO_Y + ybody[i][step]
-                
-                next_x = ABS_ZERO_X + xbody[i][step + 1]
-                next_y = ABS_ZERO_Y + ybody[i][step + 1]
-                
-                # Get current coordinates of the trajectory line
-                current_line_coords = main_canvas.coords(trajectory_lines[i])
-                
-                # Update the trajectory line to include the new point
-                main_canvas.coords(trajectory_lines[i], *current_line_coords, next_x, next_y)
-                
-                # apply changes
-                move_image_smoothly(image_objects[i], current_x, current_y, next_x, next_y, duration=0.0001)
+        next_x = ABS_ZERO_X + xbody[i][step + 1]
+        next_y = ABS_ZERO_Y + ybody[i][step + 1]
+        
+        currentArrayPosition = i 
+        currentStep = step
+        
+        # updated trajectory line, added new (x,y) pair to the list of coordinates current_line_coords
+        current_line_coords = main_canvas.coords(trajectory_lines[i])
+        main_canvas.coords(trajectory_lines[i], *current_line_coords, next_x, next_y)
+        
+        # move image
+        main_canvas.coords(image_objects[i], next_x, next_y)
 
-start_button = Button(window, text="Start Simulare", command=animate)
+        # update coordinate label
+        main_canvas.coords(coord_labels[i], next_x, next_y - 15)
+        main_canvas.itemconfig(coord_labels[i], text=f"{xbody[i][step+1]:.1f}, {ybody[i][step+1]:.1f}")
+
+    progress_label.config(text=f"Pas: {step+1}")
+    window.after(20, animate, step + 1)
+
+# start simulation
+def start_simulation():
+    global simulation_running
+    if not simulation_running:
+        simulation_running = True
+        animate(0)
+
+def delete_trajectory():
+    global trajectory_lines, isTrajectoryOff
+
+    if isTrajectoryOff:
+        # recreate all trajectory lines 
+        trajectory_lines = []
+        for i in range(file_number):
+            current_x = ABS_ZERO_X + xbody[i][currentStep]
+            current_y = ABS_ZERO_Y + ybody[i][currentStep]
+
+            traj_line = main_canvas.create_line(current_x, current_y, current_x, current_y,
+                                                fill=TRAJECTORY_COLORS[i % len(TRAJECTORY_COLORS)],
+                                                width=1)
+            trajectory_lines.append(traj_line)
+        
+        isTrajectoryOff = False
+    else:
+        # delete all trajectory lines
+        for line_id in trajectory_lines:
+            main_canvas.delete(line_id)
+        isTrajectoryOff = True
+
+
+# buttons
+start_button = Button(window, text="Start Simulare", command=start_simulation)
 start_button.place(x=10, y=10)
+
+reset_button = Button(window, text="Reset", command=reset_simulation)
+reset_button.place(x=10, y=40)
+
+erase_trajectory = Button(window, text="ON/OFF trajectory", command=delete_trajectory)
+erase_trajectory.place(x=10, y = 70)
 
 # saving image to avoid it being collected by the garbage collector
 window.image_reference = tk_image
+
+# initialize the simulation once at start
+reset_simulation()
 
 window.mainloop()

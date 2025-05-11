@@ -4,12 +4,14 @@ float h;
 
 void read_init_value(BODY *bod, int nr_corp)
 {
+    float y; 
     printf("m_%d: ", nr_corp + 1);
     scanf("%f", &bod->mass);
     printf("x_0_%d: ", nr_corp + 1);
     scanf("%f", &bod->r.x);
     printf("y_0_%d: ", nr_corp + 1);
-    scanf("%f", &bod->r.y);
+    scanf("%f", &y);
+    bod->r.y = y; //  * (-1); 
     printf("z_0_%d: ", nr_corp + 1);
     scanf("%f", &bod->r.z);
 }
@@ -225,4 +227,46 @@ void update_size(BODY *corp, int nr_total)
 void write_body_state(BODY *corp, float time)
 {
     fprintf(corp->file, "%.2f %.2f\n", corp->r.x, corp->r.y);
+}
+
+float distanta(BODY a, BODY b)
+{
+    return sqrtf(powf(a.r.x-b.r.x, 2)+powf(a.r.y-b.r.y, 2)+powf(a.r.z-b.r.z,2));
+}
+
+void collision(BODY *corp1, BODY *corp2)
+{
+    VECT newVelocity;
+    float denominator = corp1 -> mass + corp2 -> mass;
+
+    float fraction1 = 2 * corp1 -> mass / denominator;
+    float fraction2 = 2 * corp2 -> mass / denominator; 
+
+    newVelocity.x = fraction1 * corp1->v.x + fraction2 * corp2->v.x;
+    newVelocity.y = fraction1 * corp1->v.y + fraction2 * corp2->v.y;
+    newVelocity.z = fraction1 * corp1->v.z + fraction2 * corp2->v.z; 
+
+    VECT newVelocity1, newVelocity2; 
+    corp1->v.x = newVelocity.x - corp1->v.x; 
+    corp1->v.y = newVelocity.y - corp1->v.y; 
+    corp1->v.z = newVelocity.z - corp1->v.z;
+    
+    corp2->v.x = newVelocity.x - corp2->v.x; 
+    corp2->v.y = newVelocity.y - corp2->v.y; 
+    corp2->v.z = newVelocity.z - corp2->v.z;        
+}
+
+void check4collision(BODY *corp, int nr_total)
+{
+    int i, j;
+    for(i=0; i<nr_total-1; i++)
+    {
+        for(j=i+1; j<nr_total; j++)
+        {
+            if(distanta(*(corp+i), *(corp+j))<(corp+i)->raza+(corp+j)->raza)
+            {
+                collision(corp+i, corp+j);
+            }
+        }
+    }
 }
