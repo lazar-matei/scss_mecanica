@@ -90,11 +90,14 @@ int main()
         
         // update radius
         update_size(body, bodies);
+
+        // check4collision(body, bodies);
         
         // write the current state in the file
         for (i = 0; i < bodies; i++) {
             write_body_state((body + i), currentTime);
         }
+
     }
 
     printf("\nConfiguratia finala:\n");

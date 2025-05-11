@@ -38,3 +38,7 @@ void rk4(BODY *corp, int nr_total, float h);
 float dist_OB(BODY a);
 void update_size(BODY *corp, int nr_total);
 void write_body_state(BODY *corp, float time);
+void check4collision(BODY *corp, int nr_total); 
+void collision(BODY *corp1, BODY *corp2);
+float distanta(BODY a, BODY b); 
+
