@@ -6,20 +6,16 @@ window = Tk()
 window.title("N-BODY SIMULATOR")
 
 # configuration for the main window
-window_width = 1000
-window_height = 1000
+window_width = 1920
+window_height = 1080
 window.config(width=window_width, height=window_height)
 
-# window centering and configuration
 screen_width = window.winfo_screenwidth()
 screen_height = window.winfo_screenheight()
-x = int((screen_width / 2) - (window_width / 2))
-y = int((screen_height / 2) - (window_height / 2))
-window.geometry(f"{window_width}x{window_height}+{x}+{y}")
 
 # origin point
-ABS_ZERO_X = window_width // 2
-ABS_ZERO_Y = window_height // 2
+ABS_ZERO_X = screen_width // 2
+ABS_ZERO_Y = screen_height // 2
 
 # colors for trajectories
 TRAJECTORY_COLORS = ["red", "green", "blue", "yellow", "cyan", "magenta"]
@@ -40,11 +36,11 @@ main_canvas = Canvas(window, width=window_width, height=window_height)
 main_canvas.pack(fill = "both", expand= True)
 
 # function made to get the information from the files filled by the C source code
-def get_file_info():
+def get_file_info(mainFile):
     xbody = []
     ybody = []
     
-    with open("fileInfo.txt", "r") as file:
+    with open(mainFile, "r") as file:
         file_number = int(file.readline().strip()) # get the number of bodies; 
         file_names = [file.readline().strip() for _ in range(file_number)] # each file contains (x,y) peers 
     
@@ -62,7 +58,7 @@ def get_file_info():
     
     return file_number, xbody, ybody
 
-DOT = "dot.png"
+DOT = "assets/dot.png"
 original_image = Image.open(DOT)
 
 # image redimensioning 
@@ -72,27 +68,28 @@ height = int(original_image.height * 0.1)
 resized_image = original_image.resize((width, height))
 tk_image = ImageTk.PhotoImage(resized_image)
 
-PIL_bg = Image.open("bg.png")
+PIL_bg = Image.open("assets/bg.png")
 TK_bg = ImageTk.PhotoImage(PIL_bg)
 
 # Create background image at center
-bgID = main_canvas.create_image(100, 100, image=TK_bg)
+bgID = main_canvas.create_image(0, 0, anchor = "nw", image=TK_bg)
 screenimages.append(TK_bg) # save the image as reference 
 main_canvas.tag_lower(bgID) #place behind the bodies
 
 # UI elements
 progress_label = Label(window, text="Pas: 0", fg="black", bg="white", font=("Arial", 10))
 progress_label.place(x=120, y=10)
+getValuesFromFile = False
 
 # reset simulation state and UI
-def reset_simulation():
+def reset_simulation(mainFile):
     global image_objects, trajectory_lines, coord_labels, xbody, ybody
     global file_number, step_counter, simulation_running, isTrajectoryOff
 
     # delete every trace except the background
     main_canvas.delete("all")
     
-    bgID = main_canvas.create_image(window_width // 2, window_height // 2, image=TK_bg)
+    bgID = main_canvas.create_image(0, 0, anchor = "nw", image=TK_bg)
     screenimages.append(TK_bg)
     main_canvas.tag_lower(bgID)
 
@@ -102,7 +99,9 @@ def reset_simulation():
     simulation_running = False
     step_counter = 0
 
-    file_number, xbody, ybody = get_file_info()
+    xbody = [] 
+    ybody = []
+    file_number, xbody, ybody = get_file_info(mainFile)
 
     # objects' initialization
     for i in range(file_number):
@@ -118,7 +117,7 @@ def reset_simulation():
 
             # create label for coordinates
             label = main_canvas.create_text(ABS_ZERO_X + xbody[i][0], (ABS_ZERO_Y + ybody[i][0] - 15),
-                                            text=f"{xbody[i][0]:.1f}, {ybody[i][0] * (-1):.1f}", fill="black", font=("Arial", 8))
+                                            text=f"{xbody[i][0]:.1f}, {ybody[i][0] * (-1):.1f}", fill="white", font=("Arial", 9))
             coord_labels.append(label)
     progress_label.config(text="Pas: 0")
     isTrajectoryOff = False
@@ -183,21 +182,61 @@ def delete_trajectory():
             main_canvas.delete(line_id)
         isTrajectoryOff = True
 
+def select_file(bodies, type):
+    global getValuesFromFile
+    global mainFile
+
+    getValuesFromFile = True
+    if bodies == 2 and type == 1:
+        mainFile = "src/ref1/two_bodies_type_1.txt"
+    elif bodies == 2 and type == 2:
+        mainFile = "src/ref2/two_bodies_type_2.txt"
+    elif bodies == 3:
+        mainFile = "src/ref3/three_bodies.txt"
+    elif bodies == 5:
+        mainFile = "src/ref4/five_bodies.txt"
+    elif bodies == 10:
+        mainFile = "src/ref5/ten_bodies.txt"
+    elif bodies == 20: 
+        mainFile = "src/ref6/twenty_bodies.txt"
+
+    reset_simulation(mainFile)
 
 # buttons
 start_button = Button(window, text="Start Simulare", command=start_simulation)
 start_button.place(x=10, y=10)
 
-reset_button = Button(window, text="Reset", command=reset_simulation)
+reset_button = Button(window, text="Reset", command=lambda: reset_simulation(mainFile))
 reset_button.place(x=10, y=40)
 
 erase_trajectory = Button(window, text="ON/OFF trajectory", command=delete_trajectory)
 erase_trajectory.place(x=10, y = 70)
 
+two_bodies_type1 = Button(window, text="2 corpuri - v1", command = lambda:select_file(2,1))
+two_bodies_type1.place(x = 1450, y = 10)
+
+two_bodies_type2 = Button(window, text="2 corpuri - v2", command = lambda:select_file(2,2))
+two_bodies_type2.place(x = 1450, y = 40)
+
+three_bodies = Button(window, text="3 corpuri", command = lambda:select_file(3, None))
+three_bodies.place(x = 1450, y = 70)
+
+five_bodies = Button(window, text="5 corpuri", command = lambda:select_file(5, None))
+five_bodies.place(x = 1450, y = 100)
+
+ten_bodies = Button(window, text="10 corpuri", command = lambda:select_file(10, None))
+ten_bodies.place(x = 1450, y = 130)
+
+twenty_bodies = Button(window, text="20 corpuri", command = lambda:select_file(20, None))
+twenty_bodies.place(x = 1450, y = 160)
+
+# initialize the simulation once at start
+getValuesFromFile = False
+mainFile = "fileInfo.txt"
+
 # saving image to avoid it being collected by the garbage collector
 window.image_reference = tk_image
 
-# initialize the simulation once at start
-reset_simulation()
+reset_simulation(mainFile)
 
 window.mainloop()
